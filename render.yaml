@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: pawconnect
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/stats
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: neon
+      - key: NEON_JDBC_URL
+        sync: false
+      - key: NEON_USERNAME
+        sync: false
+      - key: NEON_PASSWORD
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: COOKIE_SECURE
+        value: "true"

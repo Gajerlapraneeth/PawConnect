@@ -1,0 +1,19 @@
+{
+  "name": "pawconnect-frontend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "generate:viva": "node scripts/generate-viva-pdf.js"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "6.1.2",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "vite": "8.3.4"
+  },
+  "devDependencies": {
+    "pdfkit": "0.20.2"
+  }
+}

@@ -1,4 +1,6 @@
 target/
+node_modules/
+src/main/resources/static/react-build/
 data/
 .idea/
 .vscode/

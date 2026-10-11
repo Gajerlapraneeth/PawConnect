@@ -1,0 +1,9 @@
+.git
+.idea
+.vscode
+data
+target
+**/node_modules
+src/main/resources/static/react-build
+.env
+.env.*
