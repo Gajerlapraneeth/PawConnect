@@ -1,0 +1,32 @@
+package com.pawconnect.controller;
+
+import com.pawconnect.model.*;
+import com.pawconnect.repository.*;
+import org.springframework.http.*;
+import org.springframework.web.bind.annotation.*;
+import java.util.*;
+
+@RestController
+@RequestMapping("/api")
+@CrossOrigin
+public class ApiController {
+ private final AppUserRepository users; private final FeedingSpotRepository spots; private final FeedingTaskRepository tasks; private final TaskParticipantRepository participants; private final AnimalReportRepository reports;
+ public ApiController(AppUserRepository users,FeedingSpotRepository spots,FeedingTaskRepository tasks,TaskParticipantRepository participants,AnimalReportRepository reports){this.users=users;this.spots=spots;this.tasks=tasks;this.participants=participants;this.reports=reports;}
+ private Map<String,Object> msg(String message){return Map.of("message",message);}
+ private Map<String,Object> safeUser(AppUser u){Map<String,Object> m=new LinkedHashMap<>();m.put("id",u.getId());m.put("name",u.getName());m.put("email",u.getEmail());m.put("phone",u.getPhone());m.put("role",u.getRole());return m;}
+ @PostMapping("/auth/register") public ResponseEntity<?> register(@RequestBody AppUser input){if(input.getName()==null||input.getName().isBlank()||input.getEmail()==null||input.getEmail().isBlank()||input.getPassword()==null||input.getPassword().length()<4)return ResponseEntity.badRequest().body(msg("Enter name, valid email, and password with at least 4 characters."));if(users.existsByEmailIgnoreCase(input.getEmail()))return ResponseEntity.status(HttpStatus.CONFLICT).body(msg("This email is already registered."));input.setEmail(input.getEmail().trim().toLowerCase());input.setRole("VOLUNTEER");return ResponseEntity.ok(safeUser(users.save(input)));}
+ @PostMapping("/auth/login") public ResponseEntity<?> login(@RequestBody Map<String,String> input){String email=input.getOrDefault("email","").trim();String password=input.getOrDefault("password","");Optional<AppUser> found=users.findByEmailIgnoreCase(email);if(found.isEmpty()||!found.get().getPassword().equals(password))return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(msg("Incorrect email or password."));return ResponseEntity.ok(safeUser(found.get()));}
+ @GetMapping("/users") public List<Map<String,Object>> allUsers(){return users.findAll().stream().map(this::safeUser).toList();}
+ @GetMapping("/spots") public List<FeedingSpot> allSpots(){return spots.findAll();}
+ @PostMapping("/spots") public ResponseEntity<?> addSpot(@RequestBody FeedingSpot spot){if(spot.getName()==null||spot.getName().isBlank()||spot.getLocation()==null||spot.getLocation().isBlank())return ResponseEntity.badRequest().body(msg("Spot name and location are required."));return ResponseEntity.ok(spots.save(spot));}
+ @DeleteMapping("/spots/{id}") public ResponseEntity<?> deleteSpot(@PathVariable Long id){if(!spots.existsById(id))return ResponseEntity.notFound().build();spots.deleteById(id);return ResponseEntity.ok(msg("Feeding spot deleted."));}
+ @GetMapping("/tasks") public List<Map<String,Object>> allTasks(){return tasks.findAll().stream().map(t->{Map<String,Object> m=new LinkedHashMap<>();m.put("id",t.getId());m.put("title",t.getTitle());m.put("feedingSpotId",t.getFeedingSpotId());m.put("taskDate",t.getTaskDate());m.put("taskTime",t.getTaskTime());m.put("status",t.getStatus());m.put("createdBy",t.getCreatedBy());m.put("participants",participants.findByTaskId(t.getId()).size());return m;}).toList();}
+ @PostMapping("/tasks") public ResponseEntity<?> addTask(@RequestBody FeedingTask task){if(task.getTitle()==null||task.getTitle().isBlank()||task.getFeedingSpotId()==null)return ResponseEntity.badRequest().body(msg("Task title and feeding spot are required."));if(!spots.existsById(task.getFeedingSpotId()))return ResponseEntity.badRequest().body(msg("Choose an existing feeding spot."));task.setStatus("OPEN");return ResponseEntity.ok(tasks.save(task));}
+ @PostMapping("/tasks/{id}/join") public ResponseEntity<?> joinTask(@PathVariable Long id,@RequestBody Map<String,String> input){if(!tasks.existsById(id))return ResponseEntity.notFound().build();String email=input.getOrDefault("email","").trim().toLowerCase();if(email.isBlank())return ResponseEntity.badRequest().body(msg("Enter your email to join."));if(participants.existsByTaskIdAndUserEmail(id,email))return ResponseEntity.badRequest().body(msg("You have already joined this task."));TaskParticipant p=new TaskParticipant();p.setTaskId(id);p.setUserEmail(email);participants.save(p);return ResponseEntity.ok(msg("You joined the feeding task. Thank you!"));}
+ @PatchMapping("/tasks/{id}/complete") public ResponseEntity<?> completeTask(@PathVariable Long id){Optional<FeedingTask> t=tasks.findById(id);if(t.isEmpty())return ResponseEntity.notFound().build();t.get().setStatus("COMPLETED");tasks.save(t.get());return ResponseEntity.ok(msg("Task marked completed."));}
+ @GetMapping("/reports") public List<AnimalReport> allReports(){return reports.findAll();}
+ @PostMapping("/reports") public ResponseEntity<?> addReport(@RequestBody AnimalReport report){if(report.getAnimalType()==null||report.getAnimalType().isBlank()||report.getDescription()==null||report.getDescription().isBlank()||report.getLocation()==null||report.getLocation().isBlank())return ResponseEntity.badRequest().body(msg("Animal type, description, and location are required."));report.setStatus("PENDING");return ResponseEntity.ok(reports.save(report));}
+ @PatchMapping("/reports/{id}/status") public ResponseEntity<?> updateReport(@PathVariable Long id,@RequestBody Map<String,String> input){Optional<AnimalReport> r=reports.findById(id);if(r.isEmpty())return ResponseEntity.notFound().build();String status=input.getOrDefault("status","PENDING").toUpperCase();if(!List.of("PENDING","IN_PROGRESS","RESOLVED").contains(status))return ResponseEntity.badRequest().body(msg("Status must be PENDING, IN_PROGRESS, or RESOLVED."));r.get().setStatus(status);return ResponseEntity.ok(reports.save(r.get()));}
+ @DeleteMapping("/reports/{id}") public ResponseEntity<?> deleteReport(@PathVariable Long id){if(!reports.existsById(id))return ResponseEntity.notFound().build();reports.deleteById(id);return ResponseEntity.ok(msg("Report deleted."));}
+ @GetMapping("/stats") public Map<String,Long> stats(){return Map.of("volunteers",users.count(),"feedingSpots",spots.count(),"feedingTasks",tasks.count(),"animalReports",reports.count(),"pendingReports",reports.findAll().stream().filter(r->"PENDING".equals(r.getStatus())).count());}
+}
